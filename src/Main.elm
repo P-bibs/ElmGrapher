@@ -3,7 +3,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Svg 
-import Svg.Attributes 
+import Svg.Attributes  exposing (x1, y1, x2, y2)
 
 graphWidth : Float
 graphWidth = 1000.0 
@@ -12,10 +12,10 @@ graphHeight : Float
 graphHeight = 1000.0
 
 intervalSize : Float
-intervalSize = 2
+intervalSize = 1
 
 radius : Float
-radius = 1
+radius = 0.5
 
 type alias AbstractCircle =
   {
@@ -31,24 +31,22 @@ main =
 
 -- MODEL
 type alias Model = 
-  {
-    innerScalar : Float,
-    outerScalar : Float,
-    func : (Float -> Float)
+  { innerScalar : Float
+  , outerScalar : Float
+  , func : (Float -> Float)
   }
 
 init : Model
 init =
-  {
-    innerScalar = 0.0,
-    outerScalar = 0.0,
-    func = sin
+  { innerScalar = 0.0
+  , outerScalar = 0.0
+  , func = (sin)
   }
 
 
 -- UPDATE
-type Msg = 
-    ChangeInner String
+type Msg
+  = ChangeInner String
   | ChangeOuter String
   | ChangeFunc String
 
@@ -88,10 +86,11 @@ update msg model =
 -- VIEW
 view : Model -> Html Msg
 view model =
-  div []
-    [
-      div []
-      [
+  let 
+    circleList = graphWithCircles (\n -> model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2)
+  in 
+    div [] [
+      div [] [
         div [] [Html.text ("Inner: " ++ String.fromFloat model.innerScalar)],
         Html.input [placeholder "", value (String.fromFloat model.innerScalar), onInput ChangeInner] [],
 
@@ -106,27 +105,24 @@ view model =
 
         div [] [Html.text (String.fromFloat model.outerScalar ++ "(sin/cos/tan)" ++ "(" ++ String.fromFloat model.innerScalar ++ "x)")]
       ],
-      Svg.svg
-      [
+
+      Svg.svg [
         Svg.Attributes.width (String.fromFloat graphWidth),
         Svg.Attributes.height (String.fromFloat graphHeight)
       ]
-      (
-        List.map makeSvgCircle <| graphWithCircles (\n -> model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2)
-      )
+        ((List.map makeSvgCircle circleList) ++ (makeLinesFromCircles circleList))
     ]
 
 
 -- AUXILiARY FUNCTIONS
 makeSvgCircle : AbstractCircle -> Svg.Svg msg
 makeSvgCircle circleData =
-  Svg.circle
-    [
-      Svg.Attributes.cx (String.fromFloat circleData.cx),
-      Svg.Attributes.cy (String.fromFloat circleData.cy),
-      Svg.Attributes.r (String.fromFloat circleData.r) 
-    ]
-    []
+  Svg.circle [
+    Svg.Attributes.cx (String.fromFloat circleData.cx),
+    Svg.Attributes.cy (String.fromFloat circleData.cy),
+    Svg.Attributes.r (String.fromFloat circleData.r) 
+  ]
+  []
 
 
 graphWithCircles : (Float -> Float) -> List AbstractCircle
@@ -136,3 +132,34 @@ graphWithCircles graphFunc =
     mapFunction = (\n -> AbstractCircle (n*intervalSize) (graphHeight - (graphFunc n)) radius)
   in
     List.map mapFunction mapList
+
+makeLinesFromCircles : List AbstractCircle -> List (Svg.Svg msg)
+makeLinesFromCircles circleList =
+  case circleList of
+    [] -> []
+    [a] -> []
+    [a,b] ->
+      [Svg.line [
+        x1 (String.fromFloat a.cx),
+        y1 (String.fromFloat a.cy),
+        x2 (String.fromFloat b.cx),
+        y2 (String.fromFloat b.cy),
+        Svg.Attributes.stroke "#D80707" ,
+        Svg.Attributes.strokeWidth "1",
+        Svg.Attributes.strokeMiterlimit "10",
+        Svg.Attributes.fill "none"
+        ] []
+      ]
+    a::b::_ ->
+      (Svg.line [
+        x1 (String.fromFloat a.cx),
+        y1 (String.fromFloat a.cy),
+        x2 (String.fromFloat b.cx),
+        y2 (String.fromFloat b.cy),
+        Svg.Attributes.stroke "#D80707" ,
+        Svg.Attributes.strokeWidth "1",
+        Svg.Attributes.strokeMiterlimit "10",
+        Svg.Attributes.fill "none"
+        ] []
+      ) :: makeLinesFromCircles (List.drop 1 circleList)
+  
