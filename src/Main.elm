@@ -34,6 +34,12 @@ type alias AbstractCircle =
     , r : Float
   }
 
+type alias Point =
+  {
+    x : Float,
+    y : Float
+  }
+
 
 main =
   Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
@@ -51,10 +57,10 @@ init : () -> (Model, Cmd Msg)
 init _ =
   let 
     model = {
-      innerScalar = 0.0,
-      outerScalar = 0.0,
+      innerScalar = 1.0,
+      outerScalar = 100.0,
       func = sin,
-      style = (Animation.style [ Animation.left (px 0.0), Animation.opacity 1.0])
+      style = Animation.style [Animation.points ((\n -> graphHeight/2) |> functionToPoints |> pointsToTuple)]
       }
   in
     (model, Cmd.none)
@@ -94,14 +100,28 @@ update msg model =
       Cmd.none)
 
     ChangeFunc changeData ->
-      if changeData == "sin" then
-        ({model | func = sin}, Cmd.none)
-      else if changeData == "cos" then
-        ({model | func = cos}, Cmd.none)
-      else if changeData == "tan" then
-        ({model | func = tan}, Cmd.none)
-      else
-        (model, Cmd.none)
+      let
+        newFunc = if changeData == "sin" then sin else if changeData == "cos" then cos else tan
+        funcWithScalars = addScalarsToFunction { model | func = newFunc }
+        newStyle = 
+          Animation.interrupt
+            [ Animation.to [Animation.points (funcWithScalars |> functionToPoints |> pointsToTuple)] ]
+            model.style
+      in
+        (
+          { model | style = newStyle, func = newFunc},
+          Cmd.none
+        )
+        {--
+        if changeData == "sin" then
+          ({model | func = sin}, Cmd.none)
+        else if changeData == "cos" then
+          ({model | func = cos}, Cmd.none)
+        else if changeData == "tan" then
+          ({model | func = tan}, Cmd.none)
+        else
+          (model, Cmd.none)
+        --}
 
     FadeLines ->
       ( { model
@@ -127,14 +147,15 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
   let 
-    circleList = graphWithCircles (\n -> model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2)
+    --circleList = graphWithCircles (\n -> model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2)
+    points = model |> addScalarsToFunction |> functionToPoints
   in 
     div [] [
       div [] [
         div [] [Html.text ("Inner: " ++ String.fromFloat model.innerScalar)],
         Html.input [placeholder "", value (String.fromFloat model.innerScalar), onInput ChangeInner] [],
 
-        div (Animation.render model.style) [Html.text ("Outer: " ++ String.fromFloat model.outerScalar)],
+        div [] [Html.text ("Outer: " ++ String.fromFloat model.outerScalar)],
         Html.input [placeholder "", value (String.fromFloat model.outerScalar), onInput ChangeOuter] [],
 
         div [] [],
@@ -147,14 +168,21 @@ view model =
 
         button [onClick FadeLines ] [text "Fade Out Lines"],
 
-        div [] [Html.text (String.fromFloat model.outerScalar ++ "(sin/cos/tan)" ++ "(" ++ String.fromFloat model.innerScalar ++ "x)")]
+        div [] [Html.text (String.fromFloat model.outerScalar ++ "(sin/cos/tan)" ++ "(" ++ String.fromFloat model.innerScalar ++ "x)")],
+
+        div [] [text (String.left 200 (model |> addScalarsToFunction |> functionToPoints |> pointsToString))],
+        div [] [ ]
       ],
 
       Svg.svg [
         Svg.Attributes.width (String.fromFloat graphWidth),
         Svg.Attributes.height (String.fromFloat graphHeight)
+        ]
+        --((List.map makeSvgCircle circleList) ++ (makeLinesFromCircles circleList))
+        [
+          Svg.polyline ([ Svg.Attributes.stroke "black", Svg.Attributes.fill "none", Svg.Attributes.strokeWidth "1" ] ++ Animation.render model.style)
+            []
       ]
-        ((List.map makeSvgCircle circleList) ++ (makeLinesFromCircles circleList))
     ]
 
 
@@ -168,12 +196,42 @@ makeSvgCircle circleData =
   ]
   []
 
+functionToPoints : (Float -> Float) -> List Point
+functionToPoints graphFunc =  
+  let 
+    mapList = List.map (\n -> toFloat n) (List.range 0 (truncate (graphWidth/intervalSize)))
+    mapFunction = (\n -> Point (n*intervalSize) (graphFunc (n*intervalSize)))
+  in
+    List.map mapFunction mapList
+
+
+pointsToString : List Point -> String
+pointsToString points =
+  case points of
+    [] -> 
+      ""
+    [a] -> 
+      String.fromFloat a.x ++ "," ++ String.fromFloat a.y
+    a::_ -> 
+      String.fromFloat a.x ++ "," ++ String.fromFloat a.y ++ " " ++ pointsToString (List.drop 1 points)
+
+pointsToPathCommand : List Point -> List Animation.PathStep
+pointsToPathCommand points = 
+  List.map (\n -> Animation.line n.x n.y) points
+
+pointsToTuple : List Point -> List (Float, Float)
+pointsToTuple points = 
+  List.map (\n -> (n.x, n.y) ) points
+
+addScalarsToFunction : Model -> (Float -> Float)
+addScalarsToFunction model =
+  (\n -> clamp -10 (graphHeight+10) (model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2))
 
 graphWithCircles : (Float -> Float) -> List AbstractCircle
-graphWithCircles graphFunc =
+graphWithCircles funcToGraph =
   let
     mapList = (List.map (\n -> toFloat n) (List.range 0 (truncate (graphWidth/intervalSize))))
-    mapFunction = (\n -> AbstractCircle (n*intervalSize) (graphHeight - (graphFunc n)) radius)
+    mapFunction = (\n -> AbstractCircle (n*intervalSize) (graphHeight - (funcToGraph n)) radius)
   in
     List.map mapFunction mapList
 
@@ -198,4 +256,3 @@ makeLinesFromCircles circleList =
         y2 (String.fromFloat b.cy)
         ]++defaultLineAttributes) []
       ) :: makeLinesFromCircles (List.drop 1 circleList)
-  
