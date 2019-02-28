@@ -21,9 +21,8 @@ radius = 0.5
 defaultLineAttributes : List (Svg.Attribute msg)
 defaultLineAttributes =
   [
-    Svg.Attributes.stroke "#D80707" ,
-    Svg.Attributes.strokeWidth "1",
-    Svg.Attributes.strokeMiterlimit "10",
+    Svg.Attributes.stroke "black" ,
+    Svg.Attributes.strokeWidth "2",
     Svg.Attributes.fill "none"
   ]
 
@@ -168,10 +167,10 @@ view model =
 
         button [onClick FadeLines ] [text "Fade Out Lines"],
 
-        div [] [Html.text (String.fromFloat model.outerScalar ++ "(sin/cos/tan)" ++ "(" ++ String.fromFloat model.innerScalar ++ "x)")],
+        div [] [Html.text (String.fromFloat model.outerScalar ++ "(sin/cos/tan)" ++ "(" ++ String.fromFloat model.innerScalar ++ "x)")]
 
-        div [] [text (String.left 200 (model |> addScalarsToFunction |> functionToPoints |> pointsToString))],
-        div [] [ ]
+        --debug
+        --div [] [text (String.left 200 (model |> addScalarsToFunction |> functionToPoints |> pointsToString))]
       ],
 
       Svg.svg [
@@ -180,7 +179,7 @@ view model =
         ]
         --((List.map makeSvgCircle circleList) ++ (makeLinesFromCircles circleList))
         [
-          Svg.polyline ([ Svg.Attributes.stroke "black", Svg.Attributes.fill "none", Svg.Attributes.strokeWidth "1" ] ++ Animation.render model.style)
+          Svg.polyline (defaultLineAttributes ++ Animation.render model.style)
             []
       ]
     ]
@@ -217,7 +216,7 @@ pointsToString points =
 
 pointsToPathCommand : List Point -> List Animation.PathStep
 pointsToPathCommand points = 
-  List.map (\n -> Animation.line n.x n.y) points
+  List.map (\n -> Animation.lineTo n.x n.y) points
 
 pointsToTuple : List Point -> List (Float, Float)
 pointsToTuple points = 
