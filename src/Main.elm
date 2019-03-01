@@ -15,9 +15,6 @@ graphHeight = 1000.0
 intervalSize : Float
 intervalSize = 1
 
-radius : Float
-radius = 0.5
-
 defaultLineAttributes : List (Svg.Attribute msg)
 defaultLineAttributes =
   [
@@ -25,13 +22,6 @@ defaultLineAttributes =
     Svg.Attributes.strokeWidth "2",
     Svg.Attributes.fill "none"
   ]
-
-type alias AbstractCircle =
-  {
-      cx : Float
-    , cy : Float
-    , r : Float
-  }
 
 type alias Point =
   {
@@ -70,7 +60,6 @@ type Msg
   = ChangeInner String
   | ChangeOuter String
   | ChangeFunc String
-  | FadeLines
   | Animate Animation.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -122,14 +111,6 @@ update msg model =
           (model, Cmd.none)
         --}
 
-    FadeLines ->
-      ( { model
-        | style =
-            Animation.interrupt [Animation.to [Animation.opacity 0]] model.style
-      }
-      , Cmd.none
-      )
-
     Animate animMsg ->
       ({ model
         | style = Animation.update animMsg model.style
@@ -146,7 +127,6 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
   let 
-    --circleList = graphWithCircles (\n -> model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2)
     points = model |> addScalarsToFunction |> functionToPoints
   in 
     div [] [
@@ -165,8 +145,6 @@ view model =
 
         div [] [],
 
-        button [onClick FadeLines ] [text "Fade Out Lines"],
-
         div [] [Html.text (String.fromFloat model.outerScalar ++ "(sin/cos/tan)" ++ "(" ++ String.fromFloat model.innerScalar ++ "x)")]
 
         --debug
@@ -177,7 +155,6 @@ view model =
         Svg.Attributes.width (String.fromFloat graphWidth),
         Svg.Attributes.height (String.fromFloat graphHeight)
         ]
-        --((List.map makeSvgCircle circleList) ++ (makeLinesFromCircles circleList))
         [
           Svg.polyline (defaultLineAttributes ++ Animation.render model.style)
             []
@@ -186,15 +163,6 @@ view model =
 
 
 -- AUXILiARY FUNCTIONS
-makeSvgCircle : AbstractCircle -> Svg.Svg msg
-makeSvgCircle circleData =
-  Svg.circle [
-    Svg.Attributes.cx (String.fromFloat circleData.cx),
-    Svg.Attributes.cy (String.fromFloat circleData.cy),
-    Svg.Attributes.r (String.fromFloat circleData.r) 
-  ]
-  []
-
 functionToPoints : (Float -> Float) -> List Point
 functionToPoints graphFunc =  
   let 
@@ -225,33 +193,3 @@ pointsToTuple points =
 addScalarsToFunction : Model -> (Float -> Float)
 addScalarsToFunction model =
   (\n -> clamp -10 (graphHeight+10) (model.outerScalar*(model.func (degrees (model.innerScalar)*n)) + graphHeight/2))
-
-graphWithCircles : (Float -> Float) -> List AbstractCircle
-graphWithCircles funcToGraph =
-  let
-    mapList = (List.map (\n -> toFloat n) (List.range 0 (truncate (graphWidth/intervalSize))))
-    mapFunction = (\n -> AbstractCircle (n*intervalSize) (graphHeight - (funcToGraph n)) radius)
-  in
-    List.map mapFunction mapList
-
-makeLinesFromCircles : List AbstractCircle -> List (Svg.Svg msg)
-makeLinesFromCircles circleList =
-  case circleList of
-    [] -> []
-    [a] -> []
-    [a,b] ->
-      [Svg.line ([
-        x1 (String.fromFloat a.cx),
-        y1 (String.fromFloat a.cy),
-        x2 (String.fromFloat b.cx),
-        y2 (String.fromFloat b.cy)
-        ]++defaultLineAttributes) []
-      ]
-    a::b::_ ->
-      (Svg.line ([
-        x1 (String.fromFloat a.cx),
-        y1 (String.fromFloat a.cy),
-        x2 (String.fromFloat b.cx),
-        y2 (String.fromFloat b.cy)
-        ]++defaultLineAttributes) []
-      ) :: makeLinesFromCircles (List.drop 1 circleList)
