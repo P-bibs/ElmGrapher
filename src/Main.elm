@@ -13,7 +13,7 @@ graphHeight : Float
 graphHeight = 1000.0
 
 intervalSize : Float
-intervalSize = 1
+intervalSize = 0.5
 
 defaultLineAttributes : List (Svg.Attribute msg)
 defaultLineAttributes =
@@ -49,11 +49,10 @@ init _ =
       innerScalar = 1.0,
       outerScalar = 100.0,
       func = sin,
-      style = Animation.style [Animation.points ((\n -> graphHeight/2) |> functionToPoints |> pointsToTuple)]
+      style = Animation.style [Animation.path ((\n -> graphHeight/2) |> functionToPoints |> pointsToPathCommand)]
       }
   in
     (model, Cmd.none)
-
 
 -- UPDATE
 type Msg
@@ -66,26 +65,32 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     ChangeInner changeData ->
-      ({
-        model | innerScalar =
-          case String.toFloat changeData of
-            Nothing ->
-              0
-            Just val ->
-              val
-      },
-      Cmd.none)
+      let
+        newScalar = Maybe.withDefault 0.0 (String.toFloat changeData)
+        funcWithNewScalar = addScalarsToFunction { model | innerScalar = newScalar}
+        newStyle = 
+          Animation.interrupt
+            [ Animation.to [Animation.path (funcWithNewScalar |> functionToPoints |> pointsToPathCommand)] ]
+            model.style
+      in
+        (
+          { model | style = newStyle, innerScalar = newScalar},
+          Cmd.none
+        )
 
     ChangeOuter changeData ->
-      ({
-        model | outerScalar =
-          case String.toFloat changeData of
-            Nothing ->
-              0
-            Just val ->
-              val
-      },
-      Cmd.none)
+      let
+        newScalar = Maybe.withDefault 0.0 (String.toFloat changeData)
+        funcWithNewScalar = addScalarsToFunction { model | outerScalar = newScalar}
+        newStyle = 
+          Animation.interrupt
+            [ Animation.to [Animation.path (funcWithNewScalar |> functionToPoints |> pointsToPathCommand)] ]
+            model.style
+      in
+        (
+          { model | style = newStyle, outerScalar = newScalar},
+          Cmd.none
+        )
 
     ChangeFunc changeData ->
       let
@@ -93,7 +98,7 @@ update msg model =
         funcWithScalars = addScalarsToFunction { model | func = newFunc }
         newStyle = 
           Animation.interrupt
-            [ Animation.to [Animation.points (funcWithScalars |> functionToPoints |> pointsToTuple)] ]
+            [ Animation.to [Animation.path (funcWithScalars |> functionToPoints |> pointsToPathCommand)] ]
             model.style
       in
         (
@@ -156,7 +161,7 @@ view model =
         Svg.Attributes.height (String.fromFloat graphHeight)
         ]
         [
-          Svg.polyline (defaultLineAttributes ++ Animation.render model.style)
+          Svg.path (defaultLineAttributes ++ Animation.render model.style)
             []
       ]
     ]
@@ -184,7 +189,7 @@ pointsToString points =
 
 pointsToPathCommand : List Point -> List Animation.PathStep
 pointsToPathCommand points = 
-  List.map (\n -> Animation.lineTo n.x n.y) points
+  Animation.moveTo 0 (graphHeight/2) :: (List.map (\n -> Animation.lineTo n.x n.y) points)
 
 pointsToTuple : List Point -> List (Float, Float)
 pointsToTuple points = 
